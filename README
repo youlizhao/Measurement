@@ -1,6 +1,10 @@
-This is my first project in GitHub.
+This is my first project in GitHub. 
 
-Basically, this project is to measure WiFi signal emitted from commercial NICs, esp. 11a. It includes Matlab and GNURadio codes.
+The Matlab codes are used for 802.11a signal off-line analysis. 
+  - Given rxdata sampled using USRP (20MHz), WritePacketOrder2.m will indentify the packet boundary, and store the results in variable list;
+  - Given list outputed from WritePacketOrder2.m, FilterPackets.m will indentify well-defined packets (DIFS+T*Slots+PKT+SIFS+ACK), and packets without ACK;W
 
-After all development, I will update the README. If you are interested, please contact me directly.
+Note that the Matlab codes are for 11a signal. For 11b/g signal, you should change parameters in CheckIFSType.m and CheckPACKETType.m. Also, note that ISM crowded spectrum may ruin your measurement.
+  
+Some functions are still in development. If you are interested, please contact me directly.
 Email: youlizhao.nju@gmail.com
