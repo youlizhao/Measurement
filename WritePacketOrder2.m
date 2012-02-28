@@ -1,6 +1,6 @@
 %% Input: rxdata, filename (no postfix)
 %% Output: (1) packet statitcs - list (2) output [list] and [packet order] to files
-%% List Format: STATE, start, end, TYPE, AVG_ENG
+%% List Format: STATE, start, end, length, TYPE, AVG_ENG
 %%  - STATE: ST_IDLE, ST_PACKET
 %%  - TYPE:  IFS_TYPE, PACKET_TYPE
 
@@ -14,21 +14,13 @@ function [list] = WritePacketOrder2(rxdata, filename)
 % Parameters
 ST_IDLE = 0;
 ST_PACKET = 1;
-
-DIFS_ERROR = 8;
-ERROR = 9;
-PACKET = 10;
-ACK = 11;
-BEACON = 12;
-SIFS = 20;
-DIFS = 22;
-
-UP_THRESHOLD = 0.5;             % threshold for positive peak (log)
-LOW_THRESHOLD = -0.5;           % threshold for negative peak (log)
+UP_THRESHOLD = 0.3;             % threshold for positive peak (log) = 1.9953
+LOW_THRESHOLD = -0.5;           % threshold for negative peak (log) = 0.3162
 WINDOW_SIZE = 100;              % for peak search
-
-% Calculate the window ratio
 BLOCK_SIZE=50;                  % window size
+
+% ---------------------------------- 1 ---------------------------------- %
+% Calculate the double window ratio
 value = zeros(length(rxdata),1);
 for ii=BLOCK_SIZE+1:length(rxdata)-BLOCK_SIZE
     v1 = sum(abs(rxdata(ii-BLOCK_SIZE:ii-1)));
@@ -36,17 +28,24 @@ for ii=BLOCK_SIZE+1:length(rxdata)-BLOCK_SIZE
     value(ii) = v2/v1;
 end
 %semilogy(value, 'b.-');
+%plot(value, 'b.-')
 value_diff = [0; diff(value)];
 
 list = zeros(10000, 6); 
 counter = 1;
 sum_energy = 0;
 
-% Assumption: ST_IDLE must follow by ST_PACKET. Otherwise, list(counter, 2) - list(counter-1, 2) does not work.
 ii = 1;
 while ii <= length(rxdata)-1
     sum_energy = sum_energy + abs(rxdata(ii));
     if value_diff(ii) > 0 && value_diff(ii+1) < 0 && value(ii) > 10^UP_THRESHOLD    % Start of a packet
+        % skip the case that last state is ST_PACKET, and the window energy
+        % is not high enough (10^(UP_THRESHOLD+0.2))
+        if value(ii) < 10^(UP_THRESHOLD+0.2) && counter>1 && list(counter-1, 1) == ST_PACKET
+            ii = ii + 1;
+            continue;
+        end
+            
         [~, index] = max(abs(value(ii:ii+WINDOW_SIZE))); 
         list(counter, 1) = ST_PACKET;
         list(counter, 2) = ii+index-1;
@@ -63,7 +62,7 @@ while ii <= length(rxdata)-1
     
     if value_diff(ii) < 0 && value_diff(ii+1) > 0 && value(ii) < 10^LOW_THRESHOLD   % End of a packet
  %       [~, index] = min(abs(value(ii:ii+WINDOW_SIZE)));
-        index = 0; % avoid ACK lag problem
+        index = 0; % to avoid ACK lag problem, we skip the min search step
         list(counter, 1) = ST_IDLE;
         list(counter, 2) = ii+index-1;
         if counter > 1
@@ -80,16 +79,23 @@ while ii <= length(rxdata)-1
     ii = ii + 1;
 end
 
-% ---------------------------------------------
-% --------- Write list to file -------------
-% ---------------------------------------------
+list = list(1:counter, :);
+
+% ---------------------------------- 2 ---------------------------------- %
+% Write list to file
 %list = list(1:counter-1, :);
 %name = strcat(filename, '_list.txt');
 %dlmwrite(name, list, 'delimiter', '\t', 'precision', 10);
 
-% ---------------------------------------------
-% --------- Write Packet Statitcs -------------
-% ---------------------------------------------
+% ---------------------------------- 3 ---------------------------------- %
+% Write Packet Statitcs
+DIFS_ERROR = 8;
+ERROR = 9;
+PACKET = 10;
+ACK = 11;
+BEACON = 12;
+SIFS = 20;
+DIFS = 22;
 
 name = strcat(filename, '_order.txt');
 
